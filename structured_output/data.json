@@ -1,0 +1,10 @@
+{
+    "title": "Students",
+    "description": "A collection of students with their names and ages.",
+    "type": "object",
+    "properties": {
+        "name": "string",
+        "age": "integer"
+    },
+    "required": ["name"]
+}
