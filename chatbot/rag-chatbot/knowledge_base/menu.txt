@@ -1,0 +1,34 @@
+### Indori Brews Menu ###
+
+--- Hot Coffees ---
+Espresso: ₹120
+Americano: ₹150
+Cappuccino: ₹180
+Latte: ₹180
+Mocha: ₹210
+
+--- Cold Coffees ---
+Iced Latte: ₹200
+Cold Brew: ₹190
+Frappe: ₹240
+
+--- Shakes & Smoothies ---
+Chocolate Shake: ₹220
+Oreo Shake: ₹230
+Mixed Berry Smoothie: ₹250
+
+--- Teas ---
+Masala Chai: ₹100
+Green Tea: ₹90
+Iced Tea: ₹140
+
+--- Snacks ---
+Indori Poha: ₹80
+Samosa (2 pieces): ₹60
+Veg Sandwich: ₹150
+Bhutte ka Kees: ₹110
+Garlic Bread: ₹130
+
+--- Desserts ---
+Chocolate Brownie with Ice Cream: ₹180
+Cheesecake Slice: ₹200

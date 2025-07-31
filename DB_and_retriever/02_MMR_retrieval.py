@@ -23,9 +23,14 @@ texts = [
 
 db = FAISS.from_texts(texts, embeddings)
 
-query = "What is the capital of India?"
+mmr_retriever = db.as_retriever(search_type =  "mmr", search_kwargs={'k': 2, 'fetch_k': 10})
+#here k is the final number of documents to return
 
-results = db.similarity_search(query)
+#fetch_k is the number of documents to consider for MMR to be fetched initially for re-ranking
+mmr_query = "Tell me about the capitals of Asian countries."
+mmr_docs = mmr_retriever.invoke(mmr_query)
 
-print(f"Query: {query}")
-print(f"Most relevant document: '{results[0].page_content}'")
+
+print("\n--- MMR Results ---")
+for i, doc in enumerate(mmr_docs):
+    print(f"Document {i+1}:\n'{doc.page_content}'\n")

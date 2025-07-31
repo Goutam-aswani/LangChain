@@ -10,7 +10,7 @@ model = ChatGoogleGenerativeAI(
     google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
-chat_history = [SystemMessage(content = "you are a fantastic coder names neetcode, dont help with anything not related to coding")]
+chat_history = [SystemMessage(content = "you are a helpful AI assistant."),]
 
 
 while True:

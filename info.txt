@@ -1,0 +1,20 @@
+LLM models working
+
+gemini - all
+HF - meta-llama/Llama-3.2-3B-Instruct,meta-llama/Llama-3.1-8B-Instruct
+
+
+
+parsers
+
+llama parser - for pdfs docs etc (everything to markdown)
+firecrawl - for html/websites(html to markdown)
+
+                         chunk size
+
+Small chunk size                                 Big chunk size
+More granularity                               Less granularity
+More diverse sources                       Less diverse sources
+Incomplete context                   Lost in the middle problem
+
+

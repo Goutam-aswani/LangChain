@@ -54,4 +54,5 @@ structured_output = model.with_structured_output(schema)
 
 result = structured_output.invoke("Write a review of the movie 'Inception' in one sentence, including its summary and sentiment.")
 
+# print("summary : ", result[0]['args']['summary'])
 print(result)

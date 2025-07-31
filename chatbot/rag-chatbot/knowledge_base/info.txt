@@ -1,0 +1,16 @@
+Cafe Name: Indori Brews
+Location: 123 Vijay Nagar, Indore, Madhya Pradesh
+Ambiance: A cozy and quiet cafe, perfect for working, reading, or having conversations.
+
+Timings: 
+- Monday to Friday: 9:00 AM - 10:00 PM
+- Saturday to Sunday: 8:00 AM - 11:00 PM
+
+Contact Phone: 9876543210
+Contact Email: contact@indoribrews.com
+Social Media: Find us on Instagram @IndoriBrewsCafe
+
+Services:
+- Free Wi-Fi for all customers. The password is 'indoribrews123'.
+- Pet-friendly outdoor seating area available.
+- Multiple charging points available for laptops and phones.

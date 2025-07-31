@@ -1,0 +1,13 @@
+Indori Brews - Monthly Promotions
+
+--- Monsoon Magic ---
+Description: Get 20% off on all Hot Coffees every Tuesday.
+Validity: Only on Tuesdays during the monsoon season.
+
+--- Student Special ---
+Description: Show your valid student ID and get a 10% discount on your total bill.
+Validity: Valid from Monday to Friday, 11:00 AM to 5:00 PM.
+
+--- Weekend Combo Offer ---
+Description: Enjoy a Veg Sandwich and a Cold Brew together for just ₹320.
+Validity: Only on Saturdays and Sundays.

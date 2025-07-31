@@ -1,0 +1,20 @@
+Q: Do you take reservations?
+A: We do not take reservations for small groups. We operate on a first-come, first-served basis. For groups larger than 8, please call us in advance.
+
+Q: What payment methods do you accept?
+A: We accept cash, UPI, and all major credit/debit cards.
+
+Q: Is there parking available?
+A: Yes, there is limited street parking available near the cafe.
+
+Q: Do you offer home delivery?
+A: Yes, we have partnered with Zomato and Swiggy for home delivery within a 5km radius.
+
+Q: Are pets allowed?
+A: Yes, we have a pet-friendly outdoor seating area. Pets are not allowed in the indoor AC section.
+
+Q: Do you have vegan options?
+A: Yes! Our soy milk latte, Indori Poha, and Iced Tea are vegan-friendly. Please ask our staff for more specific options when you visit.
+
+Q: Where do you get your coffee beans from?
+A: Our coffee beans are sourced directly from sustainable farms in Chikkamagaluru, Karnataka.
