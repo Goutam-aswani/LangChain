@@ -9,6 +9,42 @@ class Role(str,Enum):
     USER = "user"
     ADMIN = "admin"
 
+
+class ChatSession(SQLModel, table=True):
+    __tablename__ = "chat_sessions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    title: str = Field(index=True, description="The title of the chat session, usually the first prompt.")
+    
+    # Foreign key to link this session to a user
+    user_id: int = Field(foreign_key="users.id")
+    
+    # Establishes the one-to-many relationship from User -> ChatSession
+    user: "User" = Relationship(back_populates="sessions")
+    
+    # Establishes the one-to-many relationship to ChatMessage
+    messages: List["ChatMessage"] = Relationship(back_populates="session")
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class ChatMessage(SQLModel, table=True):
+    __tablename__ = "chat_messages"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    content: str
+    
+    # 'user' for the user's prompt, 'model' for the AI's response
+    role: str  
+    
+    # Foreign key to link this message to a session
+    session_id: int = Field(foreign_key="chat_sessions.id")
+    
+    # Establishes the relationship back to the ChatSession
+    session: ChatSession = Relationship(back_populates="messages")
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
 class User(SQLModel,table = True):
     __tablename__ = "users"
 
@@ -17,7 +53,7 @@ class User(SQLModel,table = True):
     email: EmailStr = Field(unique= True)
     hashed_password: str 
     disabled: bool = False
-
+    role: Role = Field(default=Role.USER, nullable=False)
     is_verified: bool = Field(default=False, nullable=False)
     verification_code: Optional[str] = Field(default=None, nullable=True)
     verification_code_expires_at: Optional[datetime] = Field(default=None, nullable=True)
@@ -29,6 +65,10 @@ class User(SQLModel,table = True):
         default_factory=lambda: datetime.now(UTC), nullable=True,
         sa_column_kwargs={"onupdate": lambda: datetime.now(UTC)}
     )
+    sessions: List[ChatSession] = Relationship(back_populates="user")
+
+
+
 class UserCreate(SQLModel):
     username: str
     password: str
