@@ -1,9 +1,116 @@
-// src/components/Sidebar.jsx
+// /chatbot-frontend/src/components/Sidebar.jsx
 
-import { Plus, LogOut, MessageSquare } from 'lucide-react';
+// *** FIX: Import useState, useEffect, and useRef from React ***
+import { useState, useEffect, useRef } from 'react';
+import { Plus, LogOut, MessageSquare, Trash2, MoreHorizontal, Pencil, Check, X } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
-export default function Sidebar({ sessions, onSelectSession, onNewChat, activeSessionId, isLoading }) {
+const SessionItem = ({ session, onSelect, onDelete, onRename, activeSessionId }) => {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [isRenaming, setIsRenaming] = useState(false);
+    const [title, setTitle] = useState(session.title);
+    const inputRef = useRef(null);
+
+    useEffect(() => {
+        if (isRenaming) {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+        }
+    }, [isRenaming]);
+
+    const handleDeleteClick = (e) => {
+        e.stopPropagation();
+        setMenuOpen(false);
+        onDelete(session.id);
+    };
+
+    const handleRenameClick = (e) => {
+        e.stopPropagation();
+        setMenuOpen(false);
+        setIsRenaming(true);
+    };
+
+    const handleSaveRename = (e) => {
+        e.stopPropagation();
+        if (title.trim()) {
+            onRename(session.id, title.trim());
+            setIsRenaming(false);
+        }
+    };
+
+    const handleCancelRename = (e) => {
+        e.stopPropagation();
+        setTitle(session.title); // Reset to original title
+        setIsRenaming(false);
+    };
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleSaveRename(e);
+        } else if (e.key === 'Escape') {
+            handleCancelRename(e);
+        }
+    };
+
+    const handleMenuToggle = (e) => {
+        e.stopPropagation();
+        setMenuOpen(prev => !prev);
+    };
+
+    return (
+        <div className="relative">
+            {isRenaming ? (
+                <div className="flex items-center w-full bg-hsl(var(--accent)) rounded-lg">
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        className="flex-grow bg-transparent px-3 py-2 text-sm text-white outline-none"
+                    />
+                    <button onClick={handleSaveRename} className="p-2 text-green-400 hover:text-white"><Check className="w-4 h-4" /></button>
+                    <button onClick={handleCancelRename} className="p-2 text-red-400 hover:text-white"><X className="w-4 h-4" /></button>
+                </div>
+            ) : (
+                <>
+                    <button
+                        onClick={() => onSelect(session.id)}
+                        className={`flex items-center w-full text-left pl-3 pr-10 py-2 text-sm rounded-lg truncate transition-colors ${
+                            activeSessionId === session.id 
+                            ? 'bg-blue-600/30 text-white' 
+                            : 'text-hsl(var(--muted-foreground)) hover:bg-hsl(var(--accent))'
+                        }`}
+                    >
+                        <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
+                        <span className="truncate">{session.title}</span>
+                    </button>
+                    <button
+                        onClick={handleMenuToggle}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-hsl(var(--muted-foreground)) rounded-md hover:bg-hsl(var(--accent)) hover:text-white"
+                        title="More options"
+                    >
+                        <MoreHorizontal className="w-4 h-4" />
+                    </button>
+
+                    {menuOpen && (
+                        <div className="absolute z-10 right-0 mt-1 w-32 bg-hsl(var(--secondary)) border border-hsl(var(--border)) rounded-md shadow-lg">
+                            <button onClick={handleRenameClick} className="flex items-center w-full px-3 py-2 text-sm text-left text-hsl(var(--muted-foreground)) hover:bg-hsl(var(--accent))">
+                                <Pencil className="w-4 h-4 mr-2" /> Rename
+                            </button>
+                            <button onClick={handleDeleteClick} className="flex items-center w-full px-3 py-2 text-sm text-left text-red-500 hover:bg-red-600/20">
+                                <Trash2 className="w-4 h-4 mr-2" /> Delete
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
+};
+
+
+export default function Sidebar({ sessions, onSelectSession, onNewChat, onDeleteSession, onRenameSession, activeSessionId, isLoading }) {
     const { logout } = useAuth();
     
     return (
@@ -20,18 +127,14 @@ export default function Sidebar({ sessions, onSelectSession, onNewChat, activeSe
                     <p className="text-hsl(var(--muted-foreground)) px-2">Loading...</p>
                 ) : (
                     sessions.map(session => (
-                        <button
+                        <SessionItem
                             key={session.id}
-                            onClick={() => onSelectSession(session.id)}
-                            className={`flex items-center w-full text-left px-3 py-2 text-sm rounded-lg truncate transition-colors ${
-                                activeSessionId === session.id 
-                                ? 'bg-blue-600/30 text-white' 
-                                : 'text-hsl(var(--muted-foreground)) hover:bg-hsl(var(--accent))'
-                            }`}
-                        >
-                            <MessageSquare className="w-4 h-4 mr-3 flex-shrink-0" />
-                            <span className="truncate">{session.title}</span>
-                        </button>
+                            session={session}
+                            onSelect={onSelectSession}
+                            onDelete={onDeleteSession}
+                            onRename={onRenameSession}
+                            activeSessionId={activeSessionId}
+                        />
                     ))
                 )}
             </div>

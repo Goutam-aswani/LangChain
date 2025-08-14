@@ -38,6 +38,8 @@ class NewChatMessageRequest(BaseModel):
     prompt: str
     session_id: Optional[int] = None
 
+class RenameChatRequest(BaseModel):
+    new_title: str
 
 # --- API Endpoints ---
 
@@ -119,3 +121,50 @@ def post_new_message(
     session.refresh(chat_session)
 
     return chat_session
+
+@router.put("/{session_id}", response_model=ChatSessionResponse, summary="Rename a chat session")
+def rename_chat_session(
+    session_id: int,
+    request_data: RenameChatRequest,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+):
+    chat_session = session.get(ChatSession, session_id)
+    
+    if not chat_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
+    if chat_session.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to rename this chat session")
+        
+    chat_session.title = request_data.new_title
+    session.add(chat_session)
+    session.commit()
+    session.refresh(chat_session)
+    
+    return chat_session
+
+@router.delete("/{session_id}", status_code=status.HTTP_200_OK, summary="Delete a chat session")
+def delete_chat_session(
+    *,
+    session_id: int,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Deletes a chat session and all its associated messages,
+    but only if it belongs to the current user.
+    """
+    chat_session = session.get(ChatSession, session_id)
+    
+    # Security check: Ensure the session exists and belongs to the current user
+    if not chat_session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
+    if chat_session.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this chat session")
+        
+    # SQLModel will handle cascading deletes for the messages automatically
+    # because of the relationship we defined in models.py
+    session.delete(chat_session)
+    session.commit()
+    
+    return {"message": "Chat session deleted successfully"}

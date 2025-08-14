@@ -101,5 +101,31 @@ export const api = {
             console.error('Failed to post message:', error.response?.data || error.message);
             throw new Error('Failed to post message');
         }
+    },
+    async deleteChatSession(token, sessionId) {
+        try {
+            const response = await apiClient.delete(`/chats/${sessionId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Failed to delete session:', error.response?.data || error.message);
+            throw new Error('Failed to delete session');
+        }
+    },
+    async renameChatSession(token, sessionId, newTitle) {
+        try {
+            const payload = { new_title: newTitle };
+            const response = await apiClient.put(`/chats/${sessionId}`, payload, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Failed to rename session:', error.response?.data || error.message);
+            throw new Error('Failed to rename session');
+        }
     }
 };

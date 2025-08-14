@@ -28,7 +28,12 @@ export default function LoginPage() {
     };
         
     return (
-        <div className="flex items-center justify-center h-screen bg-gray-900 text-white p-4">
+        <div
+    className="flex items-center justify-center h-screen bg-gray-900 text-white p-4 bg-cover bg-center"
+    style={{
+      backgroundImage: "url('https://i.imgur.com/3pGCUmP.jpeg')"
+    }}
+  >
             <div className="w-full max-w-sm p-8 space-y-6 bg-gray-800/50 backdrop-blur-sm rounded-2xl shadow-2xl">
                 <div className="flex flex-col items-center space-y-2">
                     <div className="bg-blue-600 p-3 rounded-full">

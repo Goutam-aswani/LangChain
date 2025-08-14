@@ -23,7 +23,11 @@ class ChatSession(SQLModel, table=True):
     user: "User" = Relationship(back_populates="sessions")
     
     # Establishes the one-to-many relationship to ChatMessage
-    messages: List["ChatMessage"] = Relationship(back_populates="session")
+    # messages: List["ChatMessage"] = Relationship(back_populates="session")
+    messages: List["ChatMessage"] = Relationship(
+        back_populates="session", 
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"}
+    )
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -29,5 +29,3 @@ export const AuthProvider = ({ children }) => {
         </AuthContext.Provider>
     );
 };
-
-// We have removed the useAuth hook from this file.
