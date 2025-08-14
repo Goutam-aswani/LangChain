@@ -10,31 +10,92 @@ const apiClient = axios.create({
 
 export const setupAuthInterceptor = (logout) => {
     apiClient.interceptors.response.use(
-        // If the response is successful, just return it
         (response) => response,
-        // If there's an error...
         (error) => {
-            // Check if the error is a 401 Unauthorized
             if (error.response && error.response.status === 401) {
-                // If it is, call the logout function that we passed in
                 logout();
             }
-            // Be sure to return the error, so it can be handled by the component if needed
             return Promise.reject(error);
         }
     );
 };
 
+
+// CHANGE: We are adding a new, separate function specifically for streaming.
+// This uses the native Fetch API because it handles response streams more effectively than Axios.
+/**
+ * Posts a message and handles the streaming response.
+ * @param {string} token - The user's authentication token.
+ * @param {string} prompt - The user's message.
+ * @param {number|null} sessionId - The ID of the current chat session.
+ * @param {function(string): void} onChunk - A callback function to handle each received chunk of text.
+ * @returns {Promise<void>} A promise that resolves when the stream is complete.
+ */
+export async function streamMessage(token, prompt, sessionId, onChunk) {
+    try {
+        // DEBUG: Log the start of the fetch request
+        console.log(`--- DEBUG: Starting stream fetch for session ${sessionId || 'new'} ---`);
+        
+        const response = await fetch(`${API_BASE_URL}/chats/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ prompt, session_id: sessionId }),
+        });
+
+        if (!response.ok) {
+            // Handle HTTP errors like 404 or 500
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        if (!response.body) {
+            throw new Error("Response body is null");
+        }
+
+        // The reader allows us to process the response stream chunk by chunk.
+        const reader = response.body.getReader();
+        // The decoder converts the raw binary chunks (Uint8Array) into readable text.
+        const decoder = new TextDecoder();
+        
+        // DEBUG: Log that the frontend is ready to read the stream.
+        console.log("--- DEBUG: Frontend ready to read stream ---");
+
+        // Loop indefinitely to read from the stream
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+                // DEBUG: Log when the stream has ended.
+                console.log("--- DEBUG: Stream finished ---");
+                break; // Exit the loop when the stream is complete.
+            }
+            
+            const chunk = decoder.decode(value);
+            // DEBUG: Log each chunk received from the backend.
+            console.log("--- DEBUG: FRONTEND CHUNK:", chunk);
+            
+            // Call the provided callback function with the new chunk of text.
+            onChunk(chunk);
+        }
+
+    } catch (error) {
+        // DEBUG: Log any errors that occur during the streaming process.
+        console.error("--- DEBUG: Error during streaming:", error);
+        // Re-throw the error so it can be caught by the component.
+        throw error;
+    }
+}
+
+
 export const api = {
     async register(username, email, password) {
         try {
             const payload = { username, email, password };
-            // Note: The backend returns the new user object upon successful registration
             const response = await apiClient.post('/users/register', payload);
             return response.data;
         } catch (error) {
             console.error('Registration failed:', error.response?.data || error.message);
-            // Re-throw the error to be handled by the component
             throw error.response?.data || new Error('Registration failed');
         }
     },
@@ -87,6 +148,8 @@ export const api = {
         }
     },
 
+    // NOTE: This function is no longer used for sending messages but is kept for reference.
+    // The new `streamMessage` function above is now used instead.
     async postMessage(token, prompt, sessionId) {
         try {
             const payload = { prompt, session_id: sessionId };
