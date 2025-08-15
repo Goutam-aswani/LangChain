@@ -13,7 +13,6 @@ export default function ChatPage() {
     const [messages, setMessages] = useState([]);
     const [isLoading, setIsLoading] = useState(false);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
-
     const [textQueue, setTextQueue] = useState('');
 
     const fetchSessions = async () => {
