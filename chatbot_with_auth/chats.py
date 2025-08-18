@@ -1,17 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List, Optional
 from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
 from limiter import limiter
 from database import get_session
 from models import User, ChatSession, ChatMessage
 from dependencies import get_current_active_user
 from chatbot_service import get_chatbot_response
 from slowapi import Limiter
-from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage, AIMessage
 
 CHAT_RATE_LIMIT = "30/minute"
-# Define the router
 router = APIRouter(
     prefix="/chats",
     tags=["Chats"],
@@ -19,8 +19,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-# --- Pydantic Models for API Requests and Responses ---
-
+# --- Pydantic Models (No changes) ---
 class ChatMessageResponse(BaseModel):
     id: int
     content: str
@@ -42,18 +41,222 @@ class NewChatMessageRequest(BaseModel):
 class RenameChatRequest(BaseModel):
     new_title: str
 
-# --- API Endpoints ---
+# # *** FIX: The function signature is corrected to accept chat_session_id (an int) ***
+# async def stream_and_save_response(prompt: str, chat_session_id: int, chat_history: list, db: Session):
+#     """
+#     Streams the chatbot response and saves the full message.
+#     Now accepts chat_session_id directly.
+#     """
+#     # *** FIX: Use the chat_session_id directly in the debug print statement ***
+#     print(f"--- DEBUG: Starting stream for session {chat_session_id} ---")
+    
+#     # Pass the complete history to the chatbot service.
+#     response_generator = get_chatbot_response(prompt, chat_history)
+    
+#     full_bot_response = ""
+#     for chunk in response_generator:
+#         full_bot_response += chunk
+#         yield chunk
+        
+#     print(f"--- DEBUG: Finished streaming. Full response: '{full_bot_response}'")
+    
+#     bot_message_to_save = ChatMessage(
+#         content=full_bot_response, 
+#         role="model", 
+#         # *** FIX: Use the chat_session_id directly when saving the message ***
+#         session_id=chat_session_id
+#     )
+#     db.add(bot_message_to_save)
+#     db.commit()
+    
+#     print(f"--- DEBUG: Saved bot response to DB for session {chat_session_id} ---")
 
+# @router.post("/", summary="Post a new message and get a streaming response")
+# def post_new_message(
+#     *,
+#     limiter: Limiter = Depends(lambda: limiter.limit(CHAT_RATE_LIMIT)),
+#     request_data: NewChatMessageRequest,
+#     session: Session = Depends(get_session),
+#     current_user: User = Depends(get_current_active_user),
+# ):
+#     chat_session = None
+#     if request_data.session_id:
+#         chat_session = session.get(ChatSession, request_data.session_id)
+#         if not chat_session or chat_session.user_id != current_user.id:
+#             raise HTTPException(status_code=404, detail="Chat session not found")
+#     else:
+#         title = request_data.prompt[:100]
+#         chat_session = ChatSession(title=title, user_id=current_user.id)
+#         session.add(chat_session)
+#         session.commit()
+#         session.refresh(chat_session)
+
+#     # *** FIX: Corrected History Assembly Logic ***
+    
+#     # 1. Fetch previous messages from the database.
+#     statement = (
+#         select(ChatMessage)
+#         .where(ChatMessage.session_id == chat_session.id)
+#         .order_by(ChatMessage.created_at)
+#         .limit(10)
+#     )
+#     db_messages = session.exec(statement).all()
+
+#     # 2. Format the fetched history for LangChain.
+#     chat_history_for_chain = []
+#     for msg in db_messages:
+#         if msg.role == "user":
+#             chat_history_for_chain.append(HumanMessage(content=msg.content))
+#         elif msg.role == "model":
+#             chat_history_for_chain.append(AIMessage(content=msg.content))
+
+#     # 3. Save the NEW user message to the database.
+#     user_message = ChatMessage(content=request_data.prompt, role="user", session_id=chat_session.id)
+#     session.add(user_message)
+#     session.commit()
+#     print(f"--- DEBUG: User message '{request_data.prompt}' saved for session {chat_session.id}")
+
+#     # *** FIX: Manually add the new user message to the history list AFTER saving it. ***
+#     # This ensures the AI gets the absolute latest context.
+#     chat_history_for_chain.append(HumanMessage(content=request_data.prompt))
+
+#     # 4. Pass the prompt, session ID, and the correctly assembled history to the streaming function.
+#     return StreamingResponse(
+#         stream_and_save_response(request_data.prompt, chat_session.id, chat_history_for_chain, session),
+#         media_type="text/plain; charset=utf-8"
+#     )
+# *** CHANGE: Modified to return session ID in response headers ***
+def stream_and_save_response_with_headers(prompt: str, chat_session_id: int, chat_history: list, db_session: Session):
+    """
+    Streams the chatbot response and saves the full message.
+    Now yields both content and session metadata.
+    """
+    print(f"--- DEBUG: Starting stream for session {chat_session_id} ---")
+    print(f"--- DEBUG: Chat history length being passed: {len(chat_history)} ---")
+   
+    response_generator = get_chatbot_response(prompt, chat_history)
+   
+    full_bot_response = ""
+    for chunk in response_generator:
+        full_bot_response += chunk
+        yield chunk
+       
+    print(f"--- DEBUG: Finished streaming. Full response: '{full_bot_response[:100]}...' ---")
+   
+    bot_message_to_save = ChatMessage(
+        content=full_bot_response,
+        role="model",
+        session_id=chat_session_id
+    )
+    db_session.add(bot_message_to_save)
+    
+    try:
+        db_session.commit()
+        print(f"--- DEBUG: Successfully saved bot response to DB for session {chat_session_id} ---")
+    except Exception as e:
+        print(f"--- DEBUG: Error saving bot response to DB: {e} ---")
+        db_session.rollback()
+        raise
+
+
+@router.post("/", summary="Post a new message and get a streaming response")
+def post_new_message(
+    *,
+    limiter: Limiter = Depends(lambda: limiter.limit(CHAT_RATE_LIMIT)),
+    request_data: NewChatMessageRequest,
+    db_session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+):
+    chat_session = None
+    # *** CHANGE: Track if we created a new session ***
+    session_was_created = False
+    
+    if request_data.session_id:
+        # *** ENHANCED DEBUG: Log the session ID being requested ***
+        print(f"--- DEBUG: Looking for existing session ID: {request_data.session_id} ---")
+        chat_session = db_session.get(ChatSession, request_data.session_id)
+        if not chat_session or chat_session.user_id != current_user.id:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        print(f"--- DEBUG: Using existing session {chat_session.id} ---")
+    else:
+        # *** ENHANCED DEBUG: Log new session creation ***
+        print(f"--- DEBUG: No session_id provided, creating new session ---")
+        title = request_data.prompt[:100] if len(request_data.prompt) > 100 else request_data.prompt
+        chat_session = ChatSession(title=title, user_id=current_user.id)
+        db_session.add(chat_session)
+        
+        try:
+            db_session.commit()
+            db_session.refresh(chat_session)
+            session_was_created = True  # *** CHANGE: Mark that we created a new session ***
+            print(f"--- DEBUG: Created NEW chat session with ID: {chat_session.id} ---")
+        except Exception as e:
+            print(f"--- DEBUG: Error creating chat session: {e} ---")
+            db_session.rollback()
+            raise HTTPException(status_code=500, detail="Failed to create chat session")
+
+    # Save the user message
+    user_message = ChatMessage(
+        content=request_data.prompt, 
+        role="user", 
+        session_id=chat_session.id
+    )
+    db_session.add(user_message)
+    
+    try:
+        db_session.commit()
+        print(f"--- DEBUG: User message saved for session {chat_session.id} ---")
+    except Exception as e:
+        print(f"--- DEBUG: Error saving user message: {e} ---")
+        db_session.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save user message")
+
+    # Fetch chat history (excluding current message)
+    statement = (
+        select(ChatMessage)
+        .where(ChatMessage.session_id == chat_session.id)
+        .order_by(ChatMessage.created_at)
+        .limit(20)
+    )
+    db_messages = db_session.exec(statement).all()
+    print(f"--- DEBUG: Fetched {len(db_messages)} messages from DB for session {chat_session.id} ---")
+
+    # Format history for LangChain (excluding the current user message)
+    chat_history_for_chain = []
+    for msg in db_messages[:-1]:
+        if msg.role == "user":
+            chat_history_for_chain.append(HumanMessage(content=msg.content))
+        elif msg.role == "model":
+            chat_history_for_chain.append(AIMessage(content=msg.content))
+    
+    print(f"--- DEBUG: Formatted {len(chat_history_for_chain)} messages for LangChain ---")
+
+    # *** CHANGE: Create StreamingResponse with custom headers that include session ID ***
+    response = StreamingResponse(
+        stream_and_save_response_with_headers(
+            request_data.prompt, 
+            chat_session.id, 
+            chat_history_for_chain, 
+            db_session
+        ),
+        media_type="text/plain; charset=utf-8"
+    )
+    
+    # *** CHANGE: Add session ID to response headers so frontend can capture it ***
+    response.headers["X-Session-ID"] = str(chat_session.id)
+    # *** CHANGE: Add flag to indicate if this was a new session ***
+    response.headers["X-Session-Created"] = str(session_was_created).lower()
+    
+    print(f"--- DEBUG: Returning response with session ID {chat_session.id} in headers ---")
+    return response
+
+# --- Other Endpoints (No changes) ---
 @router.get("/", response_model=List[ChatSessionResponse], summary="Get all chat sessions for the current user")
 def get_user_chat_sessions(
     *, 
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Fetches a list of all chat session titles and their IDs for the logged-in user,
-    which is perfect for populating the sidebar.
-    """
     return current_user.sessions
 
 @router.get("/{session_id}", response_model=ChatHistoryResponse, summary="Get the history of a specific chat session")
@@ -63,148 +266,10 @@ def get_chat_history(
     session: Session = Depends(get_session), 
     current_user: User = Depends(get_current_active_user)
 ):
-    
-    """
-    Fetches all messages for a given session ID, but only if it belongs to the current user.
-    """
     chat_session = session.get(ChatSession, session_id)
     if not chat_session or chat_session.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
     return chat_session
-
-
-async def stream_and_save_response(prompt: str, chat_session: ChatSession, db: Session):
-    """
-    Streams the chatbot response to the client and saves the full message to the DB upon completion.
-    """
-    # DEBUG: Log the start of the streaming process for a specific session.
-    print(f"--- DEBUG: Starting stream for session {chat_session.id} ---")
-    
-    # 1. Get the streaming generator from the chatbot service.
-    response_generator = get_chatbot_response(prompt)
-    
-    full_bot_response = ""
-    
-    # 2. Stream chunks to the client and simultaneously build the full response string.
-    for chunk in response_generator:
-        full_bot_response += chunk
-        # DEBUG: Log the specific chunk being sent to the client.
-        print(f"--- DEBUG: CLIENT CHUNK: {chunk}")
-        yield chunk
-        
-    # DEBUG: Log when streaming to the client has finished and show the full response.
-    print(f"--- DEBUG: Finished streaming to client for session {chat_session.id} ---")
-    print(f"--- DEBUG: Full bot response to be saved: '{full_bot_response}'")
-    
-    # 3. Once streaming is complete, save the single, full bot message to the database.
-    bot_message_to_save = ChatMessage(
-        content=full_bot_response, 
-        role="model", 
-        session_id=chat_session.id
-    )
-    db.add(bot_message_to_save)
-    db.commit()
-    
-    # DEBUG: Confirm that the bot's message has been saved to the database.
-    print(f"--- DEBUG: Saved full bot response to DB for session {chat_session.id} ---")
-
-
-@router.post("/", summary="Post a new message and get a streaming response")
-def post_new_message(
-    *,
-    limiter: Limiter = Depends(lambda: limiter.limit(CHAT_RATE_LIMIT)),
-    request_data: NewChatMessageRequest,
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    This is the core endpoint. It handles:
-    1. Creating or finding the chat session.
-    2. Saving the user's message.
-    3. Returning a StreamingResponse from the chatbot.
-    4. The helper function then saves the bot's full response after the stream ends.
-    """
-    chat_session = None
-
-    # Case 1: Continue an existing chat session
-    if request_data.session_id:
-        chat_session = session.get(ChatSession, request_data.session_id)
-        if not chat_session or chat_session.user_id != current_user.id:
-            raise HTTPException(status_code=404, detail="Chat session not found")
-    
-    # Case 2: Start a new chat session
-    else:
-        title = request_data.prompt[:100]
-        chat_session = ChatSession(title=title, user_id=current_user.id)
-        session.add(chat_session)
-        session.commit()
-        session.refresh(chat_session)
-
-    # Add the user's message to the database
-    user_message = ChatMessage(content=request_data.prompt, role="user", session_id=chat_session.id)
-    session.add(user_message)
-    session.commit()
-    # DEBUG: Confirm user message was saved.
-    print(f"--- DEBUG: User message '{request_data.prompt}' saved for session {chat_session.id}")
-    
-    # CHANGE: Return a StreamingResponse.
-    # This takes our async generator and streams its yielded chunks to the client.
-    # The media_type "text/plain" is simple and effective for streaming raw text.
-    return StreamingResponse(
-        stream_and_save_response(request_data.prompt, chat_session, session),
-        media_type="text/plain; charset=utf-8"
-    )
-
-# @router.post("/", response_model=ChatHistoryResponse, summary="Post a new message")
-# def post_new_message(
-#     *,
-#     limiter: Limiter = Depends(lambda: limiter.limit(CHAT_RATE_LIMIT)),
-#     request_data: NewChatMessageRequest, # Renamed to avoid conflict
-#     session: Session = Depends(get_session),
-#     current_user: User = Depends(get_current_active_user),
-# ):
-#     """
-#     This is the core endpoint. It handles:
-#     1. Creating a new chat session if no session_id is provided.
-#     2. Adding the user's new message to the database.
-#     3. Getting a response from the LangChain service.
-#     4. Saving the bot's response to the database.
-#     5. Returning the entire updated chat session.
-#     """
-#     chat_session = None
-
-#     # Case 1: Continue an existing chat session
-#     if request_data.session_id:
-#         chat_session = session.get(ChatSession, request_data.session_id)
-#         # Security check: ensure the session belongs to the current user
-#         if not chat_session or chat_session.user_id != current_user.id:
-#             raise HTTPException(status_code=404, detail="Chat session not found")
-    
-#     # Case 2: Start a new chat session
-#     else:
-#         # Create a title for the session from the first 100 chars of the prompt
-#         title = request_data.prompt[:100]
-#         chat_session = ChatSession(title=title, user_id=current_user.id)
-#         session.add(chat_session)
-#         session.commit()
-#         session.refresh(chat_session)
-
-#     # Add the user's message to the database
-#     user_message = ChatMessage(content=request_data.prompt, role="user", session_id=chat_session.id)
-#     session.add(user_message)
-    
-#     # Get the chatbot's response using the LangChain service
-#     bot_response_content = get_chatbot_response(request_data.prompt)
-    
-#     # Add the chatbot's message to the database
-#     bot_message = ChatMessage(content=bot_response_content, role="model", session_id=chat_session.id)
-#     session.add(bot_message)
-
-#     session.commit()
-#     # Refresh the session to load the new messages before returning
-#     session.refresh(chat_session)
-
-#     return chat_session
 
 @router.put("/{session_id}", response_model=ChatSessionResponse, summary="Rename a chat session")
 def rename_chat_session(
@@ -214,17 +279,14 @@ def rename_chat_session(
     current_user: User = Depends(get_current_active_user)
 ):
     chat_session = session.get(ChatSession, session_id)
-    
     if not chat_session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
     if chat_session.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to rename this chat session")
-        
     chat_session.title = request_data.new_title
     session.add(chat_session)
     session.commit()
     session.refresh(chat_session)
-    
     return chat_session
 
 @router.delete("/{session_id}", status_code=status.HTTP_200_OK, summary="Delete a chat session")
@@ -234,21 +296,11 @@ def delete_chat_session(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_active_user)
 ):
-    """
-    Deletes a chat session and all its associated messages,
-    but only if it belongs to the current user.
-    """
     chat_session = session.get(ChatSession, session_id)
-    
-    # Security check: Ensure the session exists and belongs to the current user
     if not chat_session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found")
     if chat_session.user_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to delete this chat session")
-        
-    # SQLModel will handle cascading deletes for the messages automatically
-    # because of the relationship we defined in models.py
     session.delete(chat_session)
     session.commit()
-    
     return {"message": "Chat session deleted successfully"}

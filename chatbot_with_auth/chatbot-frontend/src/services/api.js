@@ -34,6 +34,10 @@ export const setupAuthInterceptor = (logout) => {
 export async function streamMessage(token, prompt, sessionId, onChunk) {
     try {
         // DEBUG: Log the start of the fetch request
+        const payload = { 
+            prompt, 
+            session_id: sessionId  // This will be null for new conversations
+        };
         console.log(`--- DEBUG: Starting stream fetch for session ${sessionId || 'new'} ---`);
         
         const response = await fetch(`${API_BASE_URL}/chats/`, {
@@ -53,7 +57,13 @@ export async function streamMessage(token, prompt, sessionId, onChunk) {
         if (!response.body) {
             throw new Error("Response body is null");
         }
-
+        
+        const sessionIdFromHeaders = response.headers.get('X-Session-ID');
+        const sessionWasCreated = response.headers.get('X-Session-Created') === 'true';
+        
+        // *** ENHANCED DEBUG: Log session information from headers ***
+        console.log('--- DEBUG: Session ID from headers:', sessionIdFromHeaders);
+        console.log('--- DEBUG: Session was created:', sessionWasCreated);
         // The reader allows us to process the response stream chunk by chunk.
         const reader = response.body.getReader();
         // The decoder converts the raw binary chunks (Uint8Array) into readable text.
@@ -78,6 +88,11 @@ export async function streamMessage(token, prompt, sessionId, onChunk) {
             // Call the provided callback function with the new chunk of text.
             onChunk(chunk);
         }
+        return {
+            sessionId: sessionIdFromHeaders ? parseInt(sessionIdFromHeaders) : sessionId,
+            sessionWasCreated: sessionWasCreated
+            // originalSessionId: sessionId
+        };
 
     } catch (error) {
         // DEBUG: Log any errors that occur during the streaming process.
