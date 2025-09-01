@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     algorithm: str
     access_token_expire_minutes: int
     google_api_key: str
+    deepseek_api_key: str
+    grok_api_key: str
+    openrouter_api_key: str
+    tavily_api_key: str
     mail_username: str
     mail_password: str
     mail_from: str
